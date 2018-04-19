@@ -1,0 +1,34 @@
+Standard MOP message schemas (for fields outside the envelope):
+
+Monitor messages:
+   NTP:
+      monitor.ntp.valid                       (boolean) true if the NTP monitoring data is valid
+      monitor.ntp.errorMessage                (string)  descriptive error message if NTP monitoring data is invalid
+      monitor.ntp.peers                       [array]   list of NTP peers
+      monitor.ntp.peers[].state               (string)  state of peer
+      monitor.ntp.peers[].remote              (string)  name of peer
+      monitor.ntp.peers[].refid               (string)  reference ID for peer
+      monitor.ntp.peers[].stratum             (integer) stratum of peer (0 is top level; an independent time reference)
+      monitor.ntp.peers[].local               (boolean) true if peer is local
+      monitor.ntp.peers[].lastPolledSeconds   (integer) number of seconds since peer was last polled
+      monitor.ntp.peers[].pollIntervalSeconds (integer) number of seconds between polls of this peer
+      monitor.ntp.peers[].reached             (string)  result of last 8 polls, 1 = reached, 0 = not reached, LSB is most recent
+      monitor.ntp.peers[].delayMs             (float)   delay to this peer, in milliseconds
+      monitor.ntp.peers[].offsetMs            (float)   offset from this peer, in milliseconds
+      monitor.ntp.peers[].jitterRmsMs         (float)   RMS jitter from this peer, in milliseconds
+      monitor.ntp.validPPS                    (boolean) true if the PPS signal (from GPS) is valid
+      monitor.ntp.validTime                   (boolean) true if the GPS has a valid time fix
+      monitor.ntp.timeAccuracy                (double)  timeAccuracy, in seconds
+      monitor.ntp.satellitesUsed              (integer) number of satellites used in the latest fix
+      monitor.ntp.validFix                    (boolean) true if the GPS has a valid fix
+      monitor.ntp.fixIs3D                     (boolean) true if the GPS's fix is 3D
+      monitor.ntp.latitude                    (double)  latitude of fix, in degrees
+      monitor.ntp.longitude                   (double)  longitude of fix, in degrees
+      monitor.ntp.altitudeFt                  (double)  altitude of fix, in feet
+      monitor.ntp.fixAccuracyFt               (double)  accuracy of fix, in feet
+      monitor.ntp.satellites                  [array]   satellites used in the latest fix
+      monitor.ntp.satellites[].type           (string)  type of satellite (GPS, Galileo, or GLONASS)
+      monitor.ntp.satellites[].id             (integer) ID of satellite (within type)
+      monitor.ntp.satellites[].azimuth        (integer) azimuth of satellite from receiver, in degrees
+      monitor.ntp.satellites[].elevation      (integer) elevation of satellite from receiver, in degrees
+      monitor.ntp.satellites[].cno            (integer) carrier/noise ratio, in dbz

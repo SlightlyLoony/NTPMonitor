@@ -2,7 +2,7 @@
   "name":"ntp",
   "secret":"P8LdwiaJUaeOSj1mt0mEhYKJg4QAf4beD9VOuYu+LS2",
   "queueSize":100,
-  "cpoHost":"unifi.dilatush.com",
+  "cpoHost":"cpo.dilatush.com",
   "cpoPort":4000,
   "monitorInterval":60
 }

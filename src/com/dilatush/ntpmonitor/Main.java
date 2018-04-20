@@ -59,7 +59,9 @@ public class Main {
 
         // get our config...
         Config ntpConfig = Config.fromJSONFile( config );
-        long monitorInterval = 1000 * ntpConfig.optLongDotted( "monitorInterval", 60 );
+        long monitorIntervalSeconds = ntpConfig.optLongDotted( "monitorInterval", 60 );
+        long monitorInterval = 1000 * monitorIntervalSeconds;
+        LOG.info( "NTP Monitor is starting, publishing updates at " + monitorIntervalSeconds + " second intervals" );
 
         // start up our post office...
         po = new PostOffice( config );
@@ -102,8 +104,7 @@ public class Main {
             // publish the message...
             mailbox.send( msg );
 
-            // pretty print it to STDOUT for testing...
-            System.out.println( msg.toString( 4 ) );
+            LOG.info( "Published monitor information" );
         }
     }
 }

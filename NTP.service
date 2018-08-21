@@ -1,0 +1,21 @@
+[Unit]
+Description=NTP Monitor
+After=syslog.target
+
+[Service]
+User=ntpmon
+Type=simple
+
+# The configuration file application.properties should be here:
+
+#change this to your workspace
+WorkingDirectory=/apps/ntpmon
+
+#path to executable.
+ExecStart=/apps/ntpmon/runNTPMon.sh
+
+TimeoutStopSec=10
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

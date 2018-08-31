@@ -3,6 +3,8 @@ package com.dilatush.ntpmonitor;
 import com.dilatush.mop.Message;
 import com.dilatush.mop.util.Executor;
 import com.dilatush.util.HJSONObject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -18,6 +20,8 @@ import static com.dilatush.util.Strings.isEmpty;
  * @author Tom Dilatush  tom@dilatush.com
  */
 public class NTPMonitor {
+
+    private static final Logger LOG = LogManager.getLogger();
 
     private static final float MAX_VALID_PPS_DELAY  = 0.002f;
     private static final float MAX_VALID_PPS_OFFSET = 0.005f;
@@ -167,6 +171,7 @@ public class NTPMonitor {
         }
         catch( JSONException _e ) {
             errorMessage = "Query fix invalid JSON";
+            LOG.error( "Query fix invalid JSON: " + fixJSON, _e );
             return;
         }
         validTime = fix.getBooleanDotted( "time.valid" );
@@ -191,6 +196,7 @@ public class NTPMonitor {
         }
         catch( JSONException _e ) {
             errorMessage = "Query satellites invalid JSON";
+            LOG.error( "Query satellites invalid JSON: " + fixJSON, _e );
             return;
         }
         satellites = new ArrayList<Sat>();

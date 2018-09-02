@@ -105,6 +105,11 @@ public class Main {
             mailbox.send( msg );
 
             LOG.info( "Published monitor information" );
+
+            // if we have an error, log it...
+            if( ! msg.getBooleanDotted( "monitor.ntp.valid" ) ) {
+                LOG.error( msg.getStringDotted( "monitor.ntp.errorMessage" ) );
+            }
         }
     }
 }

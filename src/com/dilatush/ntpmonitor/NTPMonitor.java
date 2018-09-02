@@ -23,20 +23,21 @@ public class NTPMonitor {
 
     private static final Logger LOG = LogManager.getLogger();
 
-    private static final float MAX_VALID_PPS_DELAY  = 0.002f;
-    private static final float MAX_VALID_PPS_OFFSET = 0.005f;
-    private static final float MAX_VALID_PPS_JITTER = 0.005f;
-
-    private static final Executor ntpqEx = new Executor( "ntpq -p" );
+    private static final Executor ntpqpEx = new Executor( "ntpq -p" );
+    private static final Executor ntpqcEx = new Executor( "ntpq -c kerninfo" );
     private static final Executor fixEx = new Executor( "/home/tom/gpsctl/gpsctl --query fix --json" );
     private static final Executor satEx = new Executor( "/home/tom/gpsctl/gpsctl --query satellites --json" );
 
-    private static final Pattern ntpqPat = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
+    private static final Pattern ntpqpPat = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
+    private static final Pattern ntpqcPat = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9\\-.]+).*pll frequency:\\s+([0-9\\-.]+).*maximum error:\\s+([0-9\\-.]+).*", Pattern.DOTALL );
 
     private boolean valid;
     private String errorMessage;
     private List<Peer> peers;
     private boolean validPPS;
+    private double pllOffsetMs;
+    private double pllFrequencyOffsetPpm;
+    private double maxErrMs;
     private boolean validTime;
     private double timeAccuracy;
     private int satellitesUsed;
@@ -69,16 +70,19 @@ public class NTPMonitor {
         }
 
         // otherwise, fill in our collected data...
-        _message.putDotted( "monitor.ntp.validPPS",       validPPS       );
-        _message.putDotted( "monitor.ntp.validTime",      validTime      );
-        _message.putDotted( "monitor.ntp.timeAccuracy",   timeAccuracy   );
-        _message.putDotted( "monitor.ntp.satellitesUsed", satellitesUsed );
-        _message.putDotted( "monitor.ntp.validFix",       validFix       );
-        _message.putDotted( "monitor.ntp.fixIs3D",        fixIs3D        );
-        _message.putDotted( "monitor.ntp.latitude",       latitude       );
-        _message.putDotted( "monitor.ntp.longitude",      longitude      );
-        _message.putDotted( "monitor.ntp.altitudeFt",     altitudeFt     );
-        _message.putDotted( "monitor.ntp.fixAccuracyFt",  fixAccuracyFt  );
+        _message.putDotted( "monitor.ntp.pllOffsetMs",      pllOffsetMs           );
+        _message.putDotted( "monitor.ntp.pllFreqOffsetPpm", pllFrequencyOffsetPpm );
+        _message.putDotted( "monitor.ntp.maxErrMs",         maxErrMs              );
+        _message.putDotted( "monitor.ntp.validPPS",         validPPS              );
+        _message.putDotted( "monitor.ntp.validTime",        validTime             );
+        _message.putDotted( "monitor.ntp.timeAccuracy",     timeAccuracy          );
+        _message.putDotted( "monitor.ntp.satellitesUsed",   satellitesUsed        );
+        _message.putDotted( "monitor.ntp.validFix",         validFix              );
+        _message.putDotted( "monitor.ntp.fixIs3D",          fixIs3D               );
+        _message.putDotted( "monitor.ntp.latitude",         latitude              );
+        _message.putDotted( "monitor.ntp.longitude",        longitude             );
+        _message.putDotted( "monitor.ntp.altitudeFt",       altitudeFt            );
+        _message.putDotted( "monitor.ntp.fixAccuracyFt",    fixAccuracyFt         );
         JSONArray peersJSON = new JSONArray();
         _message.putDotted( "monitor.ntp.peers",          peersJSON      );
         for( Peer peer : peers ) {
@@ -118,14 +122,13 @@ public class NTPMonitor {
         valid = false;
 
         // first we run ntpq -p and analyze it...
-        validPPS = false;
-        String ntpq = ntpqEx.run();
+        String ntpq = ntpqpEx.run();
         if( isEmpty( ntpq ) ) {
-            errorMessage = "Command ntpq failed";
+            errorMessage = "Command ntpq -p failed";
             return;
         }
         peers = new ArrayList<>();
-        Matcher mat = ntpqPat.matcher( ntpq );
+        Matcher mat = ntpqpPat.matcher( ntpq );
         while( mat.find() ) {
             Peer peer = new Peer();
             char state = mat.group( 1 ).charAt( 0 );
@@ -149,14 +152,22 @@ public class NTPMonitor {
             peer.delayMs             = Float.parseFloat( mat.group( 9 ) );
             peer.offsetMs            = Float.parseFloat( mat.group( 10 ) );
             peer.jitterRmsMs         = Float.parseFloat( mat.group( 11 ) );
-
-            // when we've got the PPS, look for offset and jitter within tolerance...
-            if( ".PPS.".equals( peer.refid ) ) {
-                validPPS = (peer.delayMs <= MAX_VALID_PPS_DELAY) &&
-                        (Math.abs( peer.offsetMs ) <= MAX_VALID_PPS_OFFSET) &&
-                        (peer.jitterRmsMs <= MAX_VALID_PPS_JITTER);
-            }
             peers.add( peer );
+        }
+
+        // then we run ntpq -c kernelinfo and analyze it...
+        validPPS = false;
+        ntpq = ntpqcEx.run();
+        if( isEmpty( ntpq ) ) {
+            errorMessage = "Command ntpq -c failed";
+            return;
+        }
+        mat = ntpqcPat.matcher( ntpq );
+        if( mat.matches() ) {
+            validPPS = "sync_pps".equals( mat.group( 1 ) );
+            pllOffsetMs = Double.parseDouble( mat.group( 2 ) );
+            pllFrequencyOffsetPpm = Double.parseDouble( mat.group( 3 ) );
+            maxErrMs = Double.parseDouble( mat.group( 4 ) );
         }
 
         // now we get our fix, in JSON, and analyze it...

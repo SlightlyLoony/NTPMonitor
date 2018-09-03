@@ -1,6 +1,8 @@
 package com.dilatush.ntpmonitor;
 
+import com.dilatush.mop.Mailbox;
 import com.dilatush.mop.Message;
+import com.dilatush.mop.PostOffice;
 import com.dilatush.mop.util.Executor;
 import com.dilatush.util.HJSONObject;
 import org.apache.logging.log4j.LogManager;
@@ -31,6 +33,9 @@ public class NTPMonitor {
     private static final Pattern ntpqpPat = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
     private static final Pattern ntpqcPat = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9\\-.]+).*pll frequency:\\s+([0-9\\-.]+).*maximum error:\\s+([0-9\\-.]+).*", Pattern.DOTALL );
 
+    private final PostOffice po;
+    private final Mailbox box;
+
     private boolean valid;
     private String errorMessage;
     private List<Peer> peers;
@@ -50,6 +55,12 @@ public class NTPMonitor {
     private List<Sat> satellites;
 
 
+    public NTPMonitor( final PostOffice _po, final Mailbox _box ) {
+        po = _po;
+        box = _box;
+    }
+
+
     /**
      * Runs this monitor and fills the specified message with the results.
      *
@@ -58,8 +69,41 @@ public class NTPMonitor {
     public void fill( final Message _message ) {
 
         // first run the monitor...
-        run();
+        run();                      // collect our data...
+        fillMessage( _message );    // fill in the message...
+        post();                     // post event for our important readings...
+    }
 
+
+    /*
+     * Post event...
+     */
+    private void post() {
+
+        // if we don't have a valid capture, skip all this...
+        if( !valid ) return;
+
+        // build our event message...
+        Message msg = box.createDirectMessage( "events.post", "event.post", false );
+        msg.putDotted( "tag",                          "ntpstats" );
+        msg.putDotted( "timestamp",                    System.currentTimeMillis() );
+        msg.putDotted( "fields.validPPS",              validPPS              );
+        msg.putDotted( "fields.pllOffsetMs",           pllOffsetMs           );
+        msg.putDotted( "fields.pllFrequencyOffsetPpm", pllFrequencyOffsetPpm );
+        msg.putDotted( "fields.maxErrMs",              maxErrMs              );
+        msg.putDotted( "fields.validTime",             validTime             );
+        msg.putDotted( "fields.timeAccuracy",          timeAccuracy          );
+        msg.putDotted( "fields.satellitesUsed",        satellitesUsed        );
+
+        // send it!
+        box.send( msg );
+    }
+
+
+    /*
+     * Fills in the given message, from the data we've collected...
+     */
+    private void fillMessage( final Message _message ) {
         // no matter what, fill in the validity...
         _message.putDotted( "monitor.ntp.valid", valid );
 
@@ -253,12 +297,5 @@ public class NTPMonitor {
         private float jitterRmsMs;
 
 
-    }
-
-
-    public static void main( String[] args ) {
-        NTPMonitor mon = new NTPMonitor();
-        mon.run();
-        mon.hashCode();
     }
 }

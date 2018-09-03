@@ -70,7 +70,7 @@ public class Main {
         // set up our monitors...
         osMonitor = new OSMonitor();
         jvmMonitor = new JVMMonitor();
-        ntpMonitor = new NTPMonitor();
+        ntpMonitor = new NTPMonitor( po, mailbox );
 
         // set up our timer...
         Timer timer = new Timer( "NTP Monitor Timer", true );

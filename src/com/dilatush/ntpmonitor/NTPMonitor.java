@@ -12,6 +12,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,11 +54,13 @@ public class NTPMonitor {
     private double altitudeFt;
     private double fixAccuracyFt;
     private List<Sat> satellites;
+    private Boolean previousValidPPS;
 
 
     public NTPMonitor( final PostOffice _po, final Mailbox _box ) {
         po = _po;
         box = _box;
+        previousValidPPS = null;  // to indicate that we haven't yet recorded the PPS state...
     }
 
 
@@ -72,6 +75,40 @@ public class NTPMonitor {
         run();                      // collect our data...
         fillMessage( _message );    // fill in the message...
         post();                     // post event for our important readings...
+        postValidPPSChange();       // post an event if validPPS has changed...
+    }
+
+
+    /**
+     * Post an event if validPPS has changed...
+     */
+    private void postValidPPSChange() {
+
+        // if we haven't recorded one yet, record it leave...
+        if( previousValidPPS == null ) {
+            previousValidPPS = validPPS;
+            return;
+        }
+
+        // otherwise, see if things have changed...
+        if( previousValidPPS != validPPS ) {
+
+            // yup, they've changed - so send the event...
+            String message = "As reported by 'ntpq -c kerninfo', and noted at " + new Date().toString();
+            String subject = validPPS ? "NTP now locked to PPS" : "NTP now NOT locked to PPS";
+            Message msg = box.createDirectMessage( "events.post", "event.post", false );
+            msg.putDotted( "tag",          "pps.change"               );
+            msg.putDotted( "timestamp",    System.currentTimeMillis() );
+            msg.putDotted( "event.source", "ntp.monitor"              );
+            msg.putDotted( "event.type",    "valid.pps.changed"       );
+            msg.putDotted( "event.message", message                   );
+            msg.putDotted( "event.level",   5                         );
+            msg.putDotted( "event.subject", subject                   );
+            box.send( msg );
+        }
+
+        // record the latest...
+        previousValidPPS = validPPS;
     }
 
 

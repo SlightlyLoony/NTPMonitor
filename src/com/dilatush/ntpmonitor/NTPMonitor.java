@@ -26,6 +26,8 @@ public class NTPMonitor {
 
     private static final Logger LOG = LogManager.getLogger();
 
+    private static final double MAX_PLL_OFFSET_VARIANCE = 5.0;
+
     private static final Executor ntpqpEx = new Executor( "ntpq -p" );
     private static final Executor ntpqcEx = new Executor( "ntpq -c kerninfo" );
     private static final Executor fixEx = new Executor( "/home/tom/gpsctl/gpsctl --query fix --json" );
@@ -72,10 +74,29 @@ public class NTPMonitor {
     public void fill( final Message _message ) {
 
         // first run the monitor...
-        run();                      // collect our data...
+        runWithGlitchPrevention();  // collect our data...
         fillMessage( _message );    // fill in the message...
         post();                     // post event for our important readings...
         postValidPPSChange();       // post an event if validPPS has changed...
+    }
+
+
+    /**
+     * This function looks for anomalous PLL offset values, and re-queries if they're suspected...
+     */
+    private void runWithGlitchPrevention() {
+
+        boolean done = false;
+        do {
+            double oldPllOffsetMs = pllOffsetMs;
+            run();
+            if( oldPllOffsetMs == 0 )
+                done = true;
+            else {
+                double delta = ( pllOffsetMs - oldPllOffsetMs ) / oldPllOffsetMs;
+                done = (delta < MAX_PLL_OFFSET_VARIANCE) && (delta > (-1/MAX_PLL_OFFSET_VARIANCE));
+            }
+        } while( !done );
     }
 
 

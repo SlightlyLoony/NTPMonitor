@@ -96,6 +96,8 @@ public class NTPMonitor {
                 double delta = ( pllOffsetMs - oldPllOffsetMs ) / oldPllOffsetMs;
                 done = (delta < MAX_PLL_OFFSET_VARIANCE) && (delta > (-1/MAX_PLL_OFFSET_VARIANCE));
             }
+            if( !done )
+                LOG.info( "Re-doing poll because PLL offset jumped" );
         } while( !done );
     }
 

@@ -34,7 +34,7 @@ public class NTPMonitor {
     private static final Executor satEx = new Executor( "/home/tom/gpsctl/gpsctl --query satellites --json" );
 
     private static final Pattern ntpqpPat = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
-    private static final Pattern ntpqcPat = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9\\-.]+).*pll frequency:\\s+([0-9\\-.]+).*maximum error:\\s+([0-9\\-.]+).*", Pattern.DOTALL );
+    private static final Pattern ntpqcPat = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9Ee\\-.]+).*pll frequency:\\s+([0-9eE\\-.]+).*maximum error:\\s+([0-9Ee\\-.]+).*", Pattern.DOTALL );
 
     private final PostOffice po;
     private final Mailbox box;
@@ -74,31 +74,10 @@ public class NTPMonitor {
     public void fill( final Message _message ) {
 
         // first run the monitor...
-        runWithGlitchPrevention();  // collect our data...
+        run();  // collect our data...
         fillMessage( _message );    // fill in the message...
         post();                     // post event for our important readings...
         postValidPPSChange();       // post an event if validPPS has changed...
-    }
-
-
-    /**
-     * This function looks for anomalous PLL offset values, and re-queries if they're suspected...
-     */
-    private void runWithGlitchPrevention() {
-
-        boolean done = false;
-        do {
-            double oldPllOffsetMs = pllOffsetMs;
-            run();
-            if( oldPllOffsetMs == 0 )
-                done = true;
-            else {
-                double delta = ( pllOffsetMs - oldPllOffsetMs ) / oldPllOffsetMs;
-                done = (delta < MAX_PLL_OFFSET_VARIANCE) && (delta > (-1/MAX_PLL_OFFSET_VARIANCE));
-            }
-            if( !done )
-                LOG.info( "Re-doing poll because PLL offset jumped" );
-        } while( !done );
     }
 
 

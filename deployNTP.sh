@@ -27,5 +27,6 @@ sudo chown ntpmon:ntpmon /etc/systemd/system/NTP-monitor.service
 sudo chmod ug+xrw /etc/systemd/system/NTP-monitor.service
 sudo systemctl stop NTP-monitor.service
 sudo systemctl daemon-reload
+sudo systemctl enable NTP-monitor.service
 sudo systemctl start NTP-monitor.service
 RUN_ON_NTP

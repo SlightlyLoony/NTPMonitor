@@ -2,11 +2,8 @@ package com.dilatush.ntpmonitor;
 
 import com.dilatush.mop.Mailbox;
 import com.dilatush.mop.Message;
-import com.dilatush.mop.PostOffice;
-import com.dilatush.mop.util.Executor;
+import com.dilatush.util.Executor;
 import com.dilatush.util.HJSONObject;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -14,6 +11,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,9 +23,7 @@ import static com.dilatush.util.Strings.isEmpty;
  */
 public class NTPMonitor {
 
-    private static final Logger LOG = LogManager.getLogger();
-
-    private static final double MAX_PLL_OFFSET_VARIANCE = 5.0;
+    private static final Logger LOGGER                 = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
 
     private static final Executor ntpqpEx = new Executor( "ntpq -p" );
     private static final Executor ntpqcEx = new Executor( "ntpq -c kerninfo" );
@@ -36,7 +33,6 @@ public class NTPMonitor {
     private static final Pattern ntpqpPat = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
     private static final Pattern ntpqcPat = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9Ee\\-.]+).*pll frequency:\\s+([0-9eE\\-.]+).*maximum error:\\s+([0-9Ee\\-.]+).*", Pattern.DOTALL );
 
-    private final PostOffice po;
     private final Mailbox box;
 
     private boolean valid;
@@ -59,8 +55,7 @@ public class NTPMonitor {
     private Boolean previousValidPPS;
 
 
-    public NTPMonitor( final PostOffice _po, final Mailbox _box ) {
-        po = _po;
+    public NTPMonitor( final Mailbox _box ) {
         box = _box;
         previousValidPPS = null;  // to indicate that we haven't yet recorded the PPS state...
     }
@@ -71,7 +66,7 @@ public class NTPMonitor {
      *
      * @param _message the message to be filled.
      */
-    public void fill( final Message _message ) {
+    /* package-private */ void fill( final Message _message ) {
 
         // first run the monitor...
         run();  // collect our data...
@@ -200,7 +195,7 @@ public class NTPMonitor {
     /**
      * Runs this monitor, executing operating system commands to find its current state.
      */
-    public void run() {
+    private void run() {
 
         valid = false;
 
@@ -217,7 +212,7 @@ public class NTPMonitor {
             char state = mat.group( 1 ).charAt( 0 );
             switch( state ) {
                 case ' ': peer.state = "(none)";             break;
-                case 'x': peer.state = "Out of tolerance";   break;
+                case 'x':
                 case '-': peer.state = "Out of tolerance";   break;
                 case '#': peer.state = "Good, not used";     break;
                 case '+': peer.state = "Good, preferred";    break;
@@ -259,13 +254,13 @@ public class NTPMonitor {
             errorMessage = "Command gpsctl query fix failed";
             return;
         }
-        HJSONObject fix = null;
+        HJSONObject fix;
         try {
             fix = new HJSONObject( fixJSON );
         }
         catch( JSONException _e ) {
             errorMessage = "Query fix invalid JSON";
-            LOG.error( "Query fix invalid JSON: " + fixJSON, _e );
+            LOGGER.log( Level.SEVERE, "Query fix invalid JSON: " + fixJSON, _e );
             return;
         }
         validTime = fix.getBooleanDotted( "time.valid" );
@@ -284,16 +279,16 @@ public class NTPMonitor {
             errorMessage = "Command gpsctl query satellites failed";
             return;
         }
-        HJSONObject satData = null;
+        HJSONObject satData;
         try {
             satData = new HJSONObject( satJSON );
         }
         catch( JSONException _e ) {
             errorMessage = "Query satellites invalid JSON";
-            LOG.error( "Query satellites invalid JSON: " + fixJSON, _e );
+            LOGGER.log( Level.SEVERE, "Query satellites invalid JSON: " + fixJSON, _e );
             return;
         }
-        satellites = new ArrayList<Sat>();
+        satellites = new ArrayList<>();
         JSONArray sats = satData.getJSONArray( "satellites" );
         for( int i = 0; i < sats.length(); i++ ) {
 

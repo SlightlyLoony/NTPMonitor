@@ -6,12 +6,12 @@ import com.dilatush.mop.PostOffice;
 import com.dilatush.mop.util.JVMMonitor;
 import com.dilatush.mop.util.OSMonitor;
 import com.dilatush.util.Config;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.dilatush.util.General.isNotNull;
 import static java.lang.Thread.sleep;
@@ -27,8 +27,7 @@ import static java.lang.Thread.sleep;
  */
 public class Main {
 
-    private static Logger LOG;
-    private static PostOffice po;
+    private static final Logger LOGGER                 = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
     private static Mailbox mailbox;
     private static OSMonitor osMonitor;
     private static JVMMonitor jvmMonitor;
@@ -53,24 +52,20 @@ public class Main {
             return;
         }
 
-        // set up our logger...
-        System.setProperty( "log4j.configurationFile", logger );
-        LOG = LogManager.getLogger();
-
         // get our config...
         Config ntpConfig = Config.fromJSONFile( config );
         long monitorIntervalSeconds = ntpConfig.optLongDotted( "monitorInterval", 60 );
         long monitorInterval = 1000 * monitorIntervalSeconds;
-        LOG.info( "NTP Monitor is starting, publishing updates at " + monitorIntervalSeconds + " second intervals" );
+        LOGGER.log( Level.INFO, "NTP Monitor is starting, publishing updates at " + monitorIntervalSeconds + " second intervals" );
 
         // start up our post office...
-        po = new PostOffice( config );
+        PostOffice po = new PostOffice( config );
         mailbox = po.createMailbox( "monitor" );
 
         // set up our monitors...
         osMonitor = new OSMonitor();
         jvmMonitor = new JVMMonitor();
-        ntpMonitor = new NTPMonitor( po, mailbox );
+        ntpMonitor = new NTPMonitor( mailbox );
 
         // set up our timer...
         Timer timer = new Timer( "NTP Monitor Timer", true );
@@ -104,11 +99,11 @@ public class Main {
             // publish the message...
             mailbox.send( msg );
 
-            LOG.info( "Published monitor information" );
+            LOGGER.log( Level.INFO, "Published monitor information" );
 
             // if we have an error, log it...
             if( ! msg.getBooleanDotted( "monitor.ntp.valid" ) ) {
-                LOG.error( msg.getStringDotted( "monitor.ntp.errorMessage" ) );
+                LOGGER.log( Level.SEVERE, msg.getStringDotted( "monitor.ntp.errorMessage" ) );
             }
         }
     }

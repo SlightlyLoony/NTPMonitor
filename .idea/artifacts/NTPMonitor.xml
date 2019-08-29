@@ -4,7 +4,6 @@
     <root id="archive" name="NTPMonitor.jar">
       <element id="module-output" name="NTPMonitor" />
       <element id="extracted-dir" path="$PROJECT_DIR$/../MOP/out/artifacts/MOP.jar" path-in-jar="/" />
-      <element id="library" level="project" name="mysql-connector-java-8.0.12" />
     </root>
   </artifact>
 </component>

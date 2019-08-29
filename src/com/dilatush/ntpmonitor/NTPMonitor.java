@@ -23,15 +23,15 @@ import static com.dilatush.util.Strings.isEmpty;
  */
 public class NTPMonitor {
 
-    private static final Logger LOGGER                 = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName());
+    private static final Logger   LOGGER     = Logger.getLogger( new Object(){}.getClass().getEnclosingClass().getCanonicalName() );
 
-    private static final Executor ntpqpEx = new Executor( "ntpq -p" );
-    private static final Executor ntpqcEx = new Executor( "ntpq -c kerninfo" );
-    private static final Executor fixEx = new Executor( "/home/tom/gpsctl/gpsctl --query fix --json" );
-    private static final Executor satEx = new Executor( "/home/tom/gpsctl/gpsctl --query satellites --json" );
+    private static final Executor NTPQ_P_EX  = new Executor( "ntpq -p"                                           );
+    private static final Executor NTPQ_C_EX  = new Executor( "ntpq -c kerninfo"                                  );
+    private static final Executor FIX_EX     = new Executor( "/home/tom/gpsctl/gpsctl --query fix --json"        );
+    private static final Executor SAT_EX     = new Executor( "/home/tom/gpsctl/gpsctl --query satellites --json" );
 
-    private static final Pattern ntpqpPat = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
-    private static final Pattern ntpqcPat = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9Ee\\-.]+).*pll frequency:\\s+([0-9eE\\-.]+).*maximum error:\\s+([0-9Ee\\-.]+).*", Pattern.DOTALL );
+    private static final Pattern  NTPQ_P_PAT = Pattern.compile( "^(\\S)(\\S+)\\s+(\\S+)\\s+(\\d)\\s+([ul])\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+([\\d.]+)\\s+([\\d.-]+)\\s+([\\d.]+)$", Pattern.MULTILINE );
+    private static final Pattern  NTPQ_C_PAT = Pattern.compile( "[^,]+,\\s*([^,]+).*?pll offset:\\s+([0-9Ee\\-.]+).*pll frequency:\\s+([0-9eE\\-.]+).*maximum error:\\s+([0-9Ee\\-.]+).*", Pattern.DOTALL );
 
     private final Mailbox box;
 
@@ -200,13 +200,13 @@ public class NTPMonitor {
         valid = false;
 
         // first we run ntpq -p and analyze it...
-        String ntpq = ntpqpEx.run();
+        String ntpq = NTPQ_P_EX.run();
         if( isEmpty( ntpq ) ) {
             errorMessage = "Command ntpq -p failed";
             return;
         }
         peers = new ArrayList<>();
-        Matcher mat = ntpqpPat.matcher( ntpq );
+        Matcher mat = NTPQ_P_PAT.matcher( ntpq );
         while( mat.find() ) {
             Peer peer = new Peer();
             char state = mat.group( 1 ).charAt( 0 );
@@ -233,23 +233,23 @@ public class NTPMonitor {
             peers.add( peer );
         }
 
-        // then we run ntpq -c kernelinfo and analyze it...
+        // then we run ntpq -c rv and analyze it...
         validPPS = false;
-        ntpq = ntpqcEx.run();
+        ntpq = NTPQ_C_EX.run();
         if( isEmpty( ntpq ) ) {
             errorMessage = "Command ntpq -c failed";
             return;
         }
-        mat = ntpqcPat.matcher( ntpq );
+        mat = NTPQ_C_PAT.matcher( ntpq );
         if( mat.matches() ) {
-            validPPS = "sync_pps".equals( mat.group( 1 ) );
-            pllOffsetMs = Double.parseDouble( mat.group( 2 ) );
+            validPPS              = "sync_pps".equals( mat.group( 1 ) );
+            pllOffsetMs           = Double.parseDouble( mat.group( 2 ) );
             pllFrequencyOffsetPpm = Double.parseDouble( mat.group( 3 ) );
-            maxErrMs = Double.parseDouble( mat.group( 4 ) );
+            maxErrMs              = Double.parseDouble( mat.group( 4 ) );
         }
 
         // now we get our fix, in JSON, and analyze it...
-        String fixJSON = fixEx.run();
+        String fixJSON = FIX_EX.run();
         if( isEmpty( fixJSON ) ) {
             errorMessage = "Command gpsctl query fix failed";
             return;
@@ -274,7 +274,7 @@ public class NTPMonitor {
         fixAccuracyFt = fix.getDoubleDotted( "fix.horizontal_accuracy_mm" ) / (12.0 * 25.4);
 
         // now we get our satellites...
-        String satJSON = satEx.run();
+        String satJSON = SAT_EX.run();
         if( isEmpty( satJSON ) ) {
             errorMessage = "Command gpsctl query satellites failed";
             return;
@@ -308,6 +308,24 @@ public class NTPMonitor {
     }
 
 
+    private enum NTPLeap   { LEAP_NONE, LEAP_ADD_SECOND, LEAP_DELETE_SECOND, LEAP_ALARM; }
+    private enum NTPSource { SYNC_UNSPEC, SYNC_PPS, SYNC_LF_RADIO, SYNC_HF_RADIO,   SYNC_UHF_RADIO,
+                             SYNC_LOCAL,  SYNC_NTP, SYNC_OTHER,    SYNC_WRISTWATCH, SYNC_TELEPHONE };
+    private enum NTPEvent  { UNSPECIFIED, FREQ_NOT_SET, FREQ_SET, SPIKE_DETECT, FREQ_MODE, CLOCK_SYNC, RESTART, PANIC_STOP, NO_SYSTEM_PEER,
+                             LEAP_ARMED, LEAP_DISARMED, LEAP_EVENT, CLOCK_STEP, KERN, TAI, STALE_LEAPSECOND_VALUES  };
+
+
+    private static class NTPStatus {
+        private NTPLeap   leap;
+        private NTPSource source;
+        private int       count;
+        private NTPEvent  event;
+        private double    pllOffsetMs;
+        private double    pllFrequencyOffsetPpm;
+        private double    maxErrMs;
+    }
+
+
     private static class Sat {
         private String type;
         private int id;
@@ -318,18 +336,16 @@ public class NTPMonitor {
 
 
     private static class Peer {
-        private String state;
-        private String remote;
-        private String refid;
-        private int stratum;
+        private String  state;
+        private String  remote;
+        private String  refid;
+        private int     stratum;
         private boolean local;
-        private int lastPolledSeconds;
-        private int pollIntervalSeconds;
-        private String reached;
-        private float delayMs;
-        private float offsetMs;
-        private float jitterRmsMs;
-
-
+        private int     lastPolledSeconds;
+        private int     pollIntervalSeconds;
+        private String  reached;
+        private float   delayMs;
+        private float   offsetMs;
+        private float   jitterRmsMs;
     }
 }

@@ -4,7 +4,7 @@
 scp out/artifacts/NTPMonitor.jar ntp:/apps/ntpmon
 scp NTP-monitor.service ntp:/apps/ntpmon
 scp ntpconfig.json ntp:/apps/ntpmon
-scp ntplog.json ntp:/apps/ntpmon
+scp logging.properties ntp:/apps/ntpmon
 scp runNTPMon.sh ntp:/apps/ntpmon
 
 # execute commands on the NTP server
@@ -18,8 +18,8 @@ sudo chown ntpmon:ntpmon NTPMonitor.jar
 sudo chmod ug+xrw NTPMonitor.jar
 sudo chown ntpmon:ntpmon ntpconfig.json
 sudo chmod ug+xrw ntpconfig.json
-sudo chown ntpmon:ntpmon ntplog.json
-sudo chmod ug+xrw ntplog.json
+sudo chown ntpmon:ntpmon logging.properties
+sudo chmod ug+xrw logging.properties
 sudo chown ntpmon:ntpmon runNTPMon.sh
 sudo chmod ug+xrw runNTPMon.sh
 sudo cp -u NTP-monitor.service /etc/systemd/system

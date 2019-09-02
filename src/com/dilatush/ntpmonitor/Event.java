@@ -54,7 +54,7 @@ public enum Event {
             indexer = new EnumIndexer<>();
         indexer.add( this, _index, _id, _description );
     }
-    
+
 
     /**
      * Returns the {@link Event} that has the given identifying string, or <code>null</code> if there is no such {@link Event}.
